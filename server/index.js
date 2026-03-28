@@ -289,11 +289,12 @@ io.on('connection', (socket) => {
 
   socket.on('join_room', ({ roomId }) => {
     const user = socketToUser[socket.id];
-    if (!user) return socket.emit('error', 'Not authenticated');
+    if (!user) return socket.emit('error', 'Not authenticated — try refreshing');
     const room = rooms[roomId];
-    if (!room) return socket.emit('error', 'Room not found');
+    console.log(`Join attempt: ${user.username} → room ${roomId}, exists: ${!!room}, active rooms: ${Object.keys(rooms).join(', ')}`);
+    if (!room) return socket.emit('error', `Room "${roomId}" not found — check the code or ask host to recreate`);
     if (room.status !== 'waiting') return socket.emit('error', 'Game already started');
-    if (room.players.length >= 4) return socket.emit('error', 'Room is full');
+    if (room.players.length >= 4) return socket.emit('error', 'Room is full (max 4 players)');
     if (room.players.find(p => p.id === user.id)) {
       socket.join(roomId);
       socket.emit('room_joined', { roomId });

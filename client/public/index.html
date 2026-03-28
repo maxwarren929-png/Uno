@@ -736,11 +736,19 @@ const API_BASE = window.location.origin;
 let token = localStorage.getItem('uno_token');
 let currentUser = JSON.parse(localStorage.getItem('uno_user') || 'null');
 let socket = null;
+let socketAuthed = false;
+let socketAuthCallbacks = [];
 let currentRoom = null;
 let gameState = null;
 let selectedCard = null;
 let pendingWildCard = null;
 let isHost = false;
+
+// Wait until socket is authenticated before emitting room events
+function whenAuthed(fn) {
+  if (socketAuthed) { fn(); return; }
+  socketAuthCallbacks.push(fn);
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 (function init() {
@@ -755,8 +763,14 @@ let isHost = false;
 
 // ── Socket ────────────────────────────────────────────────────────────────────
 function connectSocket() {
+  socketAuthed = false;
   socket = io(API_BASE);
   socket.on('connect', () => { socket.emit('auth', { token }); });
+  socket.on('authed', () => {
+    socketAuthed = true;
+    socketAuthCallbacks.forEach(fn => fn());
+    socketAuthCallbacks = [];
+  });
   socket.on('room_created', ({ roomId }) => {
     currentRoom = roomId;
     isHost = true;
@@ -882,13 +896,14 @@ async function loadLeaderboard() {
 // ── Room ──────────────────────────────────────────────────────────────────────
 function createRoom() {
   if (!socket) return;
-  socket.emit('create_room');
+  whenAuthed(() => socket.emit('create_room'));
 }
 
 function joinRoom() {
   const code = document.getElementById('join-code').value.trim().toUpperCase();
   if (code.length !== 6) return showAlert('join-alert', 'Code must be 6 characters', 'error');
-  socket.emit('join_room', { roomId: code });
+  showAlert('join-alert', 'Connecting...', 'success');
+  whenAuthed(() => socket.emit('join_room', { roomId: code }));
 }
 
 function startGame() {
@@ -1186,3 +1201,5 @@ document.addEventListener('keydown', e => {
 </script>
 </body>
 </html>
+
+
